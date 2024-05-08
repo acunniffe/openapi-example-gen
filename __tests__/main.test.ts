@@ -1,42 +1,34 @@
-import { Delays, greeter } from '../src/main.js';
+import { applyTemplate, collectAllExamples } from '../src/main.js';
+import * as fs from 'fs-extra';
+import { OpenAPIV3_1 } from 'openapi-types';
+import * as yaml from 'js-yaml';
 
-describe('greeter function', () => {
-  const name = 'John';
-  let hello: string;
+it('jsonpath finds valid examples', () => {
+  const spec = readYaml('openapi-petstore.yaml');
+  const examples = collectAllExamples(spec);
 
-  let timeoutSpy: jest.SpyInstance;
-
-  // Act before assertions
-  beforeAll(async () => {
-    // Read more about fake timers
-    // http://facebook.github.io/jest/docs/en/timer-mocks.html#content
-    // Jest 27 now uses "modern" implementation of fake timers
-    // https://jestjs.io/blog/2021/05/25/jest-27#flipping-defaults
-    // https://github.com/facebook/jest/pull/5171
-    jest.useFakeTimers();
-    timeoutSpy = jest.spyOn(global, 'setTimeout');
-
-    const p: Promise<string> = greeter(name);
-    jest.runOnlyPendingTimers();
-    hello = await p;
-  });
-
-  // Teardown (cleanup) after assertions
-  afterAll(() => {
-    timeoutSpy.mockRestore();
-  });
-
-  // Assert if setTimeout was called properly
-  it('delays the greeting by 2 seconds', () => {
-    expect(setTimeout).toHaveBeenCalledTimes(1);
-    expect(setTimeout).toHaveBeenLastCalledWith(
-      expect.any(Function),
-      Delays.Long,
-    );
-  });
-
-  // Assert greeter result
-  it('greets a user with `Hello, {name}` message', () => {
-    expect(hello).toBe(`Hello, ${name}`);
-  });
+  expect(examples).toMatchSnapshot();
 });
+
+it('can create patches from evaluated patches', () => {
+  const spec = readYaml('openapi-petstore.yaml');
+  const examples = collectAllExamples(spec);
+
+  const values = {
+    template: 'Example',
+    url: 'https://google.com',
+    uuid_1: '2c359099-4c7d-4ab0-8883-6680769b0c0d',
+  };
+
+  const patches1 = applyTemplate(examples[0]!, values, spec);
+  expect(patches1).toMatchSnapshot();
+
+  const patches2 = applyTemplate(examples[1]!, values, spec);
+  expect(patches2).toMatchSnapshot();
+});
+
+function readYaml(path: string) {
+  const contents = yaml.load(fs.readFileSync(path, 'utf8'));
+
+  return contents as OpenAPIV3_1.Document;
+}
